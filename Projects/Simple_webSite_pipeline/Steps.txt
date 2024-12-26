@@ -1,0 +1,75 @@
+Шаг 1: Подготовка окружения
+
+    1. На сервере EC2:
+        
+        Убедитесь, что установлен веб-сервер (например, Apache):
+        
+          sudo apt update
+          sudo apt install apache2 -y
+        
+        Разрешите доступ к SSH через Security Group в AWS:
+        
+          Откройте порт 22 для Jenkins-сервера.
+        
+        Проверьте, что Apache обслуживает файлы из /var/www/html:
+        
+          echo "Hello World!" | sudo tee /var/www/html/index.html
+    
+    2. На сервере Jenkins:
+        
+        Убедитесь, что Jenkins доступен по публичному IP и порту 8080.
+        
+        Установите плагины в Jenkins:
+        
+          Git Plugin (для работы с GitHub).
+          
+          Publish Over SSH Plugin (для передачи файлов на EC2).
+
+Шаг 2: Настройка Jenkins
+
+    1. Подготовка SSH-ключей:
+    
+        На сервере Jenkins сгенерируйте ключи (если их нет):
+        
+        sudo -u jenkins ssh-keygen -t rsa -b 2048 -f /var/lib/jenkins/.ssh/id_rsa -q -N ""
+        
+        Скопируйте публичный ключ на EC2:
+        
+        ssh-copy-id -i /var/lib/jenkins/.ssh/id_rsa.pub ubuntu@<EC2_IP>
+    
+    2. Добавьте Webhook в GitHub:
+    
+        Перейдите в Settings вашего репозитория GitHub.
+        
+        В разделе Webhooks добавьте новый Webhook:
+        
+        Payload URL: http://<JENKINS_PUBLIC_IP>:8080/github-webhook/
+        
+        Content type: application/json.
+        
+        Выберите события Just the push event.
+    
+    3. Создание Jenkins Job:
+    
+        Нажмите New Item и создайте Freestyle Project.
+        
+        Настройте:
+        
+        Source Code Management:
+        
+        Выберите Git.
+        
+        Укажите URL репозитория: https://github.com/<username>/<repository>.git.
+        
+        Укажите ветку (например, main).
+        
+        Build Triggers:
+        
+        Включите GitHub hook trigger for GITScm polling.
+        
+        Build Steps:
+        
+        Добавьте шаг Execute Shell с командами:
+
+        scp -i /var/lib/jenkins/.ssh/id_rsa index.html ubuntu@<EC2_IP>:/var/www/html/
+        ssh -i /var/lib/jenkins/.ssh/id_rsa ubuntu@<EC2_IP> "sudo systemctl restart apache2"
